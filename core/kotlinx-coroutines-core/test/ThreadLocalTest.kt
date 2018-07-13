@@ -1,9 +1,9 @@
 
-package kotlinx.coroutines.experimental
+package kotlinx.coroutines
 
 import org.junit.*
 import org.junit.Test
-import kotlin.coroutines.experimental.*
+import kotlin.coroutines.*
 import kotlin.test.*
 
 @Suppress("RedundantAsync")

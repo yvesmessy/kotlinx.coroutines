@@ -1,7 +1,7 @@
-package kotlinx.coroutines.experimental.internal
+package kotlinx.coroutines.internal
 
-import kotlinx.coroutines.experimental.*
-import kotlin.coroutines.experimental.*
+import kotlinx.coroutines.*
+import kotlin.coroutines.*
 
 
 private val ZERO = Symbol("ZERO")
