@@ -13,11 +13,11 @@ import kotlin.coroutines.intrinsics.*
  * while waiting to be dispatched.
  */
 public fun <T> (suspend () -> T).startCoroutineCancellable(completion: Continuation<T>) =
-    createCoroutineUnintercepted(completion).intercepted().resumeCancellable(Unit)
+    isolateCoroutine(completion) { createCoroutineUnintercepted(it) }.resumeCancellable(Unit)
 
 /**
  * Use this function to start coroutine in a cancellable way, so that it can be cancelled
  * while waiting to be dispatched.
  */
 public fun <R, T> (suspend (R) -> T).startCoroutineCancellable(receiver: R, completion: Continuation<T>) =
-    createCoroutineUnintercepted(receiver, completion).intercepted().resumeCancellable(Unit)
+    isolateCoroutine(completion) { createCoroutineUnintercepted(receiver, it) }.resumeCancellable(Unit)

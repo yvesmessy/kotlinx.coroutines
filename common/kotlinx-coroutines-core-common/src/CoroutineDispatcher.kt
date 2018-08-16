@@ -5,6 +5,7 @@
 package kotlinx.coroutines
 
 import kotlin.coroutines.*
+import kotlinx.coroutines.internal.*
 
 /**
  * Base class that shall be extended by all coroutine dispatcher implementations.
@@ -81,8 +82,10 @@ public abstract class CoroutineDispatcher :
     /**
      * Returns continuation that wraps the original [continuation], thus intercepting all resumptions.
      */
-    public override fun <T> interceptContinuation(continuation: Continuation<T>): Continuation<T> =
-        DispatchedContinuation(this, continuation)
+    public override fun <T> interceptContinuation(continuation: Continuation<T>): Continuation<T> {
+        freeze() // dispatcher must be frozen
+        return DispatchedContinuation(this, continuation)
+    }
 
     /**
      * @suppress **Error**: Operator '+' on two CoroutineDispatcher objects is meaningless.

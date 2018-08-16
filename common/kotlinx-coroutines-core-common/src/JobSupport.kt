@@ -83,8 +83,11 @@ internal open class JobSupport constructor(active: Boolean) : Job, SelectClause0
     // Note: use shared objects while we have no listeners
     private val _state = atomic<Any?>(if (active) EMPTY_ACTIVE else EMPTY_NEW)
 
-    @Volatile
-    private var parentHandle: DisposableHandle? = null
+    private val _parentHandle = atomic<DisposableHandle?>(null)
+
+    private var parentHandle: DisposableHandle?
+        get() = _parentHandle.value
+        set(value) { _parentHandle.value = value }
 
     // ------------ initialization ------------
 
@@ -96,13 +99,13 @@ internal open class JobSupport constructor(active: Boolean) : Job, SelectClause0
     internal fun initParentJobInternal(parent: Job?) {
         check(parentHandle == null)
         if (parent == null) {
-            parentHandle = NonDisposableHandle
+            check(_parentHandle.getAndSet(NonDisposableHandle) == null)
             return
         }
         parent.start() // make sure the parent is started
         @Suppress("DEPRECATION")
         val handle = parent.attachChild(this)
-        parentHandle = handle
+        check(_parentHandle.getAndSet(handle) == null)
         // now check our state _after_ registering (see tryFinalizeStateActually order of actions)
         if (isCompleted) {
             handle.dispose()
@@ -172,7 +175,7 @@ internal open class JobSupport constructor(active: Boolean) : Job, SelectClause0
          *    collection
          * 4) Pass it upstream
          */
-        val finalException = synchronized(expect) {
+        val finalException = expect.lock.withLock {
             if (_state.value !== expect) {
                 return false
             }
@@ -186,16 +189,21 @@ internal open class JobSupport constructor(active: Boolean) : Job, SelectClause0
             buildException(expect).also { expect.seal() }
         }
         val update = Cancelled(this, finalException ?: expect.cancelled!!.cause)
-        if (tryFinalizeStateActually(expect, update, mode)) return true
-        //  ^^^^ this CAS never fails: we're in the state when no jobs can be attached, because state is already sealed
+        if (tryFinalizeStateActually(expect, update, mode)) {
+            //  ^^^^ this CAS never fails: we're in the state when no jobs can be attached, because state is already sealed
+            expect.dispose()
+            return true
+        }
         val error = AssertionError("Unexpected state: ${_state.value}, expected: $expect, update: $update")
         handleOnCompletionException(error)
         throw error
     }
 
-    private fun buildException(state: Finishing): Throwable? {
-        val cancelled = state.cancelled!!
-        val suppressed = state.exceptions
+    private fun buildException(state: Finishing): Throwable? = state.withExceptions {
+        buildExceptionFromSuppressed(state.cancelled!!, it)
+    }
+
+    private fun buildExceptionFromSuppressed(cancelled: Cancelled, suppressed: List<Throwable>): Throwable? {
         /*
          * This is a place where we step on our API limitation:
          * We can't distinguish internal JobCancellationException from our parent
@@ -856,60 +864,78 @@ internal open class JobSupport constructor(active: Boolean) : Job, SelectClause0
     ) : Incomplete {
         override val isActive: Boolean get() = cancelled == null
 
-        // guarded by `synchronized(this)`
-        val exceptions: List<Throwable> get() = when(_exceptionsHolder) {
-            NOT_INITIALIZED -> emptyList()
-            is Throwable -> listOf(_exceptionsHolder as Throwable) // EA should handle this
-            else -> (_exceptionsHolder as List<Throwable>)
+        @JvmField val lock = lockFor(this)
+
+        // guarded by lock
+        // Contains null | NOT_INITIALIZED | Throwable | IsolatedRef<ArrayList>
+        private val _exceptions =
+            atomic<Any?>(if (cancelled == null) null else NOT_INITIALIZED)
+
+        fun dispose() {
+            lock.dispose()
+            check(_exceptions.value == null)
         }
 
-        // guarded by `synchronized(this)`
-        // Contains null | NOT_INITIALIZED | Throwable | ArrayList
-        private var _exceptionsHolder: Any? = if (cancelled == null) null else NOT_INITIALIZED
+        // guarded by lock
+        inline fun <T> withExceptions(crossinline block: (List<Throwable>) -> T): T =
+            when(val exceptions = _exceptions.value) {
+                NOT_INITIALIZED -> block(emptyList())
+                is Throwable -> block(listOf(exceptions)) // EA should handle this
+                else -> (exceptions as IsolatedRef<List<Throwable>>).withValue(block)
+            }
 
         fun addException(exception: Throwable): Boolean =
-            synchronized(this) {
+            lock.withLock {
                 addExceptionLocked(exception)
             }
 
-        // guarded by `synchronized(this)`
+        // guarded by lock
         fun addExceptionLocked(exception: Throwable): Boolean =
-            when (_exceptionsHolder) {
+            when (val exceptions = _exceptions.value) {
                 null -> false
                 NOT_INITIALIZED -> {
-                    _exceptionsHolder = exception
+                    _exceptions.value = exception
                     true
                 }
                 is Throwable -> {
-                    val previous = _exceptionsHolder
-                    _exceptionsHolder = ArrayList<Any?>(4).apply {
-                        add(previous)
-                        add(exception)
-
+                    // Workaround for KT-26467, todo: remove
+                    val box: Any? = isolate {
+                        ArrayList<Throwable>(4).apply {
+                            add(exceptions)
+                            add(exception)
+                        }
                     }
+                    _exceptions.value = box
                     true
                 }
-                else -> (_exceptionsHolder as ArrayList<Throwable>).add(exception)
+                else -> (exceptions as IsolatedRef<ArrayList<Throwable>>).withValue {
+                    add(exception)
+                    true
+                }
             }
 
         /**
          * Seals current state. After [seal] call all consecutive calls to [addException]
          * return `false` forcing callers to handle pending exception by themselves.
-         * This call should be guarded by `synchronized(this)`
+         * This call is guarded by lock.
          */
         fun seal() {
-            _exceptionsHolder = null
+            val exceptions = _exceptions.value
+            // todo: fold (cannot do it now, due to inline classes bugs)
+            if (exceptions is IsolatedRef<*>) exceptions.dispose()
+            _exceptions.value = null
         }
 
         fun transferExceptions(to: Finishing) {
-            synchronized(this) {
-                synchronized(to) {
-                    val holder = _exceptionsHolder
-                    when(holder) {
-                        // Note: "to" cannot be sealed at this point and adding exception there mush succeed.
-                        is Throwable -> require(to.addExceptionLocked(holder))
-                        is List<*> -> holder.forEach {
-                            require(to.addExceptionLocked(it as Throwable))
+            lock.withLock {
+                to.lock.withLock {
+                    when(val exceptions = _exceptions.value) {
+                        // Note: "to" cannot be sealed at this point and adding exception there must succeed.
+                        is Throwable -> require(to.addExceptionLocked(exceptions))
+                        is IsolatedRef<*> -> (exceptions as IsolatedRef<List<Throwable>>).withValue {
+                            forEach {
+                                require(to.addExceptionLocked(it))
+                            }
                         }
                     }
                     seal()

@@ -6,13 +6,26 @@ package kotlinx.coroutines
 
 import kotlin.coroutines.*
 import kotlinx.coroutines.timeunit.*
+import kotlinx.atomicfu.*
 
-internal val currentEventLoop = ArrayList<BlockingEventLoop>()
+private val lastThreadId = atomic(0)
 
-private fun takeEventLoop(): BlockingEventLoop =
-    currentEventLoop.firstOrNull() ?: error("There is no event loop. Use runBlocking { ... } to start one.")
+@ThreadLocal
+internal object LocalDispatcher : CoroutineDispatcher(), Delay {
+    internal val threadId: Int = lastThreadId.incrementAndGet()
+    
+    private var currentEventLoop: BlockingEventLoop? = null
 
-internal object DefaultExecutor : CoroutineDispatcher(), Delay {
+    internal fun updateCurrentEventLoop(newEventLoop: BlockingEventLoop): BlockingEventLoop? =
+        currentEventLoop.also { currentEventLoop = newEventLoop }
+
+    internal fun restoreCurrentEventLoop(oldEventLoop: BlockingEventLoop?) {
+        currentEventLoop = oldEventLoop
+    }
+
+    private fun takeEventLoop(): BlockingEventLoop =
+        currentEventLoop ?: error("There is no event loop. Use runBlocking { ... } to start one.")
+
     override fun dispatch(context: CoroutineContext, block: Runnable) =
         takeEventLoop().dispatch(context, block)
     override fun scheduleResumeAfterDelay(time: Long, unit: TimeUnit, continuation: CancellableContinuation<Unit>) =
@@ -37,9 +50,9 @@ internal object DefaultExecutor : CoroutineDispatcher(), Delay {
  * This is the default [CoroutineDispatcher] that is used by all standard builders like
  * [launch], [async], etc if no dispatcher nor any other [ContinuationInterceptor] is specified in their context.
  */
-public actual val DefaultDispatcher: CoroutineDispatcher = DefaultExecutor
+public actual val DefaultDispatcher: CoroutineDispatcher = LocalDispatcher
 
-internal actual val DefaultDelay: Delay = DefaultExecutor
+internal actual val DefaultDelay: Delay = LocalDispatcher
 
 /**
  * Creates context for the new coroutine. It installs [DefaultDispatcher] when no other dispatcher nor
