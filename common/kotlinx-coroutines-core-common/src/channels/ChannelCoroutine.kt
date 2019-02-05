@@ -21,8 +21,6 @@ internal open class ChannelCoroutine<E>(
         cancel(null)
     }
 
-    override fun cancel0(): Boolean = cancel(null)
-
     override fun cancel(cause: Throwable?): Boolean {
         val wasCancelled = _channel.cancel(cause)
         if (wasCancelled) super.cancel(cause) // cancel the job

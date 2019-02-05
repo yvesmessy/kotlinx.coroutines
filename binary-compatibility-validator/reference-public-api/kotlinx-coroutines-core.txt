@@ -470,10 +470,6 @@ public abstract interface class kotlinx/coroutines/channels/ActorScope : kotlinx
 	public abstract fun getChannel ()Lkotlinx/coroutines/channels/Channel;
 }
 
-public final class kotlinx/coroutines/channels/ActorScope$DefaultImpls {
-	public static synthetic fun cancel (Lkotlinx/coroutines/channels/ActorScope;)Z
-}
-
 public abstract interface class kotlinx/coroutines/channels/BroadcastChannel : kotlinx/coroutines/channels/SendChannel {
 	public abstract fun cancel (Ljava/lang/Throwable;)Z
 	public abstract fun openSubscription ()Lkotlinx/coroutines/channels/ReceiveChannel;
@@ -499,10 +495,6 @@ public abstract interface class kotlinx/coroutines/channels/Channel : kotlinx/co
 	public static final field Factory Lkotlinx/coroutines/channels/Channel$Factory;
 	public static final field RENDEZVOUS I
 	public static final field UNLIMITED I
-}
-
-public final class kotlinx/coroutines/channels/Channel$DefaultImpls {
-	public static synthetic fun cancel (Lkotlinx/coroutines/channels/Channel;)Z
 }
 
 public final class kotlinx/coroutines/channels/Channel$Factory {
@@ -676,7 +668,6 @@ public abstract interface class kotlinx/coroutines/channels/ProducerScope : kotl
 
 public abstract interface class kotlinx/coroutines/channels/ReceiveChannel {
 	public abstract fun cancel ()V
-	public abstract synthetic fun cancel ()Z
 	public abstract fun cancel (Ljava/lang/Throwable;)Z
 	public abstract fun getOnReceive ()Lkotlinx/coroutines/selects/SelectClause1;
 	public abstract fun getOnReceiveOrNull ()Lkotlinx/coroutines/selects/SelectClause1;
@@ -689,7 +680,6 @@ public abstract interface class kotlinx/coroutines/channels/ReceiveChannel {
 }
 
 public final class kotlinx/coroutines/channels/ReceiveChannel$DefaultImpls {
-	public static synthetic fun cancel (Lkotlinx/coroutines/channels/ReceiveChannel;)Z
 	public static synthetic fun cancel$default (Lkotlinx/coroutines/channels/ReceiveChannel;Ljava/lang/Throwable;ILjava/lang/Object;)Z
 }
 
