@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.terminal.*
 /**
  * Returns the flow that emits the count of values in the original stream.
  */
-public fun <T : Any> Flow<T>.count(): Flow<Long> = flow {
+public inline fun <T : Any> Flow<T>.count(): Flow<Long> = flow {
     var i = 0L
     collect {
         ++i

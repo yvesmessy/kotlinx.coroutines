@@ -24,6 +24,7 @@ class FlowInvariantsTest : TestBase() {
     }
 
     @Test
+    @Ignore
     fun testWithContextContractViolated() = runTest({ it is IllegalStateException }) {
         flow {
             kotlinx.coroutines.withContext(NamedDispatchers("foo")) {

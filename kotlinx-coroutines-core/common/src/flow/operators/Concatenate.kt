@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.terminal.*
 /**
  * Concatenates values of each flow sequentially, without interleaving them.
  */
-public fun <T : Any> Flow<Flow<T>>.concatenate(): Flow<T> = flow {
+public inline fun <T : Any> Flow<Flow<T>>.concatenate(): Flow<T> = flow {
     collect {
         val inner = it
         inner.collect { value ->

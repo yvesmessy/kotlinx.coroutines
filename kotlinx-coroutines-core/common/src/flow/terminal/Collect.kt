@@ -21,7 +21,7 @@ import kotlinx.coroutines.flow.*
  * }
  * ```
  */
-public suspend fun <T : Any> Flow<T>.collect(action: suspend (value: T) -> Unit): Unit =
+public suspend inline fun <T : Any> Flow<T>.collect(crossinline action: suspend (value: T) -> Unit): Unit =
     collect(object : FlowCollector<T> {
         override suspend fun emit(value: T) = action(value)
     })
