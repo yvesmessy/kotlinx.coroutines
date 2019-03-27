@@ -28,7 +28,7 @@ class FoldTest : TestBase() {
     }
 
     @Test
-    @Ignore // K/N fails here
+//    @Ignore // K/N fails here
     fun testErrorCancelsUpstream() = runTest {
         val latch = Channel<Unit>()
         val flow = flow {

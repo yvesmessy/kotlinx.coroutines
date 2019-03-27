@@ -70,7 +70,7 @@ class ConcatenateMapTest : TestBase() {
     }
 
     @Test
-    @Ignore // K/N fails here
+//    @Ignore // K/N fails here
     fun testFailureInMapOperation() = runTest {
         val latch = Channel<Unit>()
         val flow = flow {
