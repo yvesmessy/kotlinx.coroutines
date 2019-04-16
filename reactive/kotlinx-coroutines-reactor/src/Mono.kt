@@ -32,7 +32,8 @@ fun <T> CoroutineScope.mono(
     context: CoroutineContext = EmptyCoroutineContext,
     block: suspend CoroutineScope.() -> T?
 ): Mono<T> = Mono.create { sink ->
-    val newContext = newCoroutineContext(context)
+    val reactorContext = (coroutineContext[ReactorContext]?.context?.putAll(sink.currentContext()) ?: sink.currentContext()).asCoroutineContext()
+    val newContext = newCoroutineContext(context + reactorContext)
     val coroutine = MonoCoroutine(newContext, sink)
     sink.onDispose(coroutine)
     coroutine.start(CoroutineStart.DEFAULT, coroutine, block)
