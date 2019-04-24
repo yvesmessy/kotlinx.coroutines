@@ -12,3 +12,11 @@ tasks.withType(dokka.getClass()) {
         url = new URL('https://projectreactor.io/docs/core/3.2.5.RELEASE/api/')
     }
 }
+
+compileTestKotlin {
+    kotlinOptions.jvmTarget = "1.8"
+}
+
+compileKotlin {
+    kotlinOptions.jvmTarget = "1.8"
+}
