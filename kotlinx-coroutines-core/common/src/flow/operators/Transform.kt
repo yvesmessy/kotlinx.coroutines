@@ -26,7 +26,7 @@ import kotlinx.coroutines.flow.unsafeFlow as flow
  * ```
  */
 @FlowPreview
-public fun <T, R> Flow<T>.transform(@BuilderInference transformer: suspend FlowCollector<R>.(value: T) -> Unit): Flow<R> {
+public inline fun <T, R> Flow<T>.transform(@BuilderInference crossinline transformer: suspend FlowCollector<R>.(value: T) -> Unit): Flow<R> {
     return flow {
         collect { value ->
             transformer(value)
@@ -38,7 +38,7 @@ public fun <T, R> Flow<T>.transform(@BuilderInference transformer: suspend FlowC
  * Returns a flow containing only values of the original flow that matches the given [predicate].
  */
 @FlowPreview
-public fun <T> Flow<T>.filter(predicate: suspend (T) -> Boolean): Flow<T> = flow {
+public inline fun <T> Flow<T>.filter(crossinline predicate: suspend (T) -> Boolean): Flow<T> = flow {
     collect { value ->
         if (predicate(value)) emit(value)
     }
@@ -48,7 +48,7 @@ public fun <T> Flow<T>.filter(predicate: suspend (T) -> Boolean): Flow<T> = flow
  * Returns a flow containing only values of the original flow that do not match the given [predicate].
  */
 @FlowPreview
-public fun <T> Flow<T>.filterNot(predicate: suspend (T) -> Boolean): Flow<T> = flow {
+public inline fun <T> Flow<T>.filterNot(crossinline predicate: suspend (T) -> Boolean): Flow<T> = flow {
     collect { value ->
         if (!predicate(value)) emit(value)
     }
@@ -73,7 +73,7 @@ public fun <T: Any> Flow<T?>.filterNotNull(): Flow<T> = flow<T> {
  * Returns a flow containing the results of applying the given [transformer] function to each value of the original flow.
  */
 @FlowPreview
-public fun <T, R> Flow<T>.map(transformer: suspend (value: T) -> R): Flow<R> = transform { value -> emit(transformer(value)) }
+public inline fun <T, R> Flow<T>.map(crossinline transformer: suspend (value: T) -> R): Flow<R> = transform { value -> emit(transformer(value)) }
 
 /**
  * Returns a flow that contains only non-null results of applying the given [transformer] function to each value of the original flow.
