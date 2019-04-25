@@ -67,7 +67,7 @@ public fun <T> Flow<T>.retry(
                 }
                 break
             } catch (e: Throwable) {
-                if (fromDownstream) throw e
+                if (fromDownstream || e.isCancellation()) throw e
                 if (!predicate(e) || retries-- == 0) throw e
             }
         }
@@ -92,3 +92,6 @@ private fun <T> Flow<T>.collectSafely(onException: suspend FlowCollector<T>.(Thr
             onException(e)
         }
     }
+
+
+private fun Throwable.isCancellation() = this is CancellationException

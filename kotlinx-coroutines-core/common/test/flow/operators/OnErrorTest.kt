@@ -8,47 +8,6 @@ import kotlinx.coroutines.*
 import kotlin.test.*
 
 class OnErrorTest : TestBase() {
-    @Test
-    fun testRetry() = runTest {
-        var counter = 0
-        val flow = flow {
-            emit(1)
-            if (++counter < 4) throw TestException()
-        }
-
-        assertEquals(4, flow.retry(4).sum())
-        counter = 0
-        assertFailsWith<TestException>(flow)
-        counter = 0
-        assertFailsWith<TestException>(flow.retry(2))
-    }
-
-    @Test
-    fun testRetryPredicate() = runTest {
-        var counter = 0
-        val flow = flow {
-            emit(1);
-            if (++counter == 1) throw TestException()
-        }
-
-        assertEquals(2, flow.retry(1) { it is TestException }.sum())
-        counter = 0
-        assertFailsWith<TestException>(flow.retry(1) { it !is TestException })
-    }
-
-    @Test
-    fun testRetryExceptionFromDownstream() = runTest {
-        var executed = 0
-        val flow = flow {
-            emit(1)
-        }.retry(42).map {
-            ++executed
-            throw TestException()
-        }
-
-        assertFailsWith<TestException>(flow)
-        assertEquals(1, executed)
-    }
 
     @Test
     fun testOnErrorReturn() = runTest {
