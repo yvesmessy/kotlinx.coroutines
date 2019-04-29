@@ -21,8 +21,6 @@ import kotlin.math.*
 @State(Scope.Benchmark)
 open class FlowPlaysScrabbleOpt : ShakespearePlaysScrabble() {
 
-    private fun String.asFlow() = chars().asFlow()
-
     @Benchmark
     public override fun play(): List<Map.Entry<Int, List<String>>> {
         val histoOfLetters = { word: String ->
@@ -118,6 +116,12 @@ open class FlowPlaysScrabbleOpt : ShakespearePlaysScrabble() {
     }
 }
 
+public fun String.asFlow() = flow {
+    forEach {
+        emit(it.toInt())
+    }
+}
+
 public suspend inline fun Flow<Int>.sum(): Int {
     val collector = object : FlowCollector<Int> {
         public var sum = 0
@@ -179,13 +183,6 @@ public fun <T, R> Flow<T>.flatMapConcatIterable(transformer: (T) -> Iterable<R>)
         transformer(value).forEach { r ->
             emit(r)
         }
-    }
-}
-
-public fun IntStream.asFlow(): Flow<Int> = flow {
-    val iterator = Spliterators.iterator(spliterator())
-    while (iterator.hasNext()) {
-        emit(iterator.next())
     }
 }
 

@@ -73,7 +73,7 @@ public fun <T: Any> Flow<T?>.filterNotNull(): Flow<T> = flow<T> {
  * Returns a flow containing the results of applying the given [transformer] function to each value of the original flow.
  */
 @FlowPreview
-public inline fun <T, R> Flow<T>.map(crossinline transformer: suspend (value: T) -> R): Flow<R> = transform { value -> emit(transformer(value)) }
+public inline fun <T, R> Flow<T>.map(crossinline transformer: suspend (value: T) -> R): Flow<R> = flow { collect { emit(transformer(it)) } }
 
 /**
  * Returns a flow that contains only non-null results of applying the given [transformer] function to each value of the original flow.

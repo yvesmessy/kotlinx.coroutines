@@ -113,14 +113,23 @@ public fun <T> Sequence<T>.asFlow(): Flow<T> = unsafeFlow {
 }
 
 /**
- * Creates flow that produces values from the given array of elements.
+ * Creates flow that produces values from the given array of [values].
  */
 @FlowPreview
-public fun <T> flowOf(vararg elements: T): Flow<T> = unsafeFlow {
-    for (element in elements) {
-        emit(element)
+public fun <T> flowOf(vararg values: T): Flow<T> = unsafeFlow {
+    for (value in values) {
+        emit(value)
     }
 }
+
+/**
+ * Creates flow that produces given [value]
+ */
+@FlowPreview
+public fun <T> flowOf(value: T): Flow<T> = unsafeFlow {
+    emit(value)
+}
+
 
 /**
  * Returns an empty flow.
