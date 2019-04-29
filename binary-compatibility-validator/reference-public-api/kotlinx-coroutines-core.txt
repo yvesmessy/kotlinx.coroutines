@@ -991,7 +991,7 @@ public abstract interface class kotlinx/coroutines/sync/Semaphore {
 public final class kotlinx/coroutines/sync/SemaphoreKt {
 	public static final fun Semaphore (II)Lkotlinx/coroutines/sync/Semaphore;
 	public static synthetic fun Semaphore$default (IIILjava/lang/Object;)Lkotlinx/coroutines/sync/Semaphore;
-	public static final fun withSemaphore (Lkotlinx/coroutines/sync/Semaphore;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun withPermit (Lkotlinx/coroutines/sync/Semaphore;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class kotlinx/coroutines/test/TestCoroutineContext : kotlin/coroutines/CoroutineContext {

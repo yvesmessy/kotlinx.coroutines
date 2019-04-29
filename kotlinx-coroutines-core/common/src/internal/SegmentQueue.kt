@@ -2,10 +2,11 @@ package kotlinx.coroutines.internal
 
 import kotlinx.atomicfu.AtomicRef
 import kotlinx.atomicfu.atomic
+import kotlinx.atomicfu.loop
 
 /**
  * Essentially, this segment queue is an infinite array of segments, which is represented as
- * a Michael-Scott queue of them. All segments are instances of [Segment] interface and
+ * a Michael-Scott queue of them. All segments are instances of [Segment] class and
  * follow in natural order (see [Segment.id]) in the queue.
  *
  * In some data structures, like `Semaphore`, this queue is used for storing suspended continuations
@@ -16,12 +17,15 @@ import kotlinx.atomicfu.atomic
 internal abstract class SegmentQueue<S: Segment<S>>(createFirstSegmentLazily: Boolean = false) {
     private val _head: AtomicRef<S?>
     /**
-     * Returns the first segment in the queue. All segments with lower [id]
+     * Returns the first segment in the queue.
      */
-    protected val first: S? get() = _head.value
+    protected val head: S? get() = _head.value
 
     private val _tail: AtomicRef<S?>
-    protected val last: S? get() = _tail.value
+    /**
+     * Returns the last segment in the queue.
+     */
+    protected val tail: S? get() = _tail.value
 
     init {
         val initialSegment = if (createFirstSegmentLazily) null else newSegment(0)
@@ -37,7 +41,7 @@ internal abstract class SegmentQueue<S: Segment<S>>(createFirstSegmentLazily: Bo
 
     /**
      * Finds a segment with the specified [id] following by next references from the
-     * [startFrom] segment. The typical use-case is reading [last] or [first], doing some
+     * [startFrom] segment. The typical use-case is reading [tail] or [head], doing some
      * synchronization, and invoking [getSegment] or [getSegmentAndMoveFirst] correspondingly
      * to find the required segment.
      */
@@ -50,7 +54,7 @@ internal abstract class SegmentQueue<S: Segment<S>>(createFirstSegmentLazily: Bo
             if (_head.compareAndSet(null, firstSegment))
                 startFrom = firstSegment
             else {
-                startFrom = first!!
+                startFrom = head!!
             }
         }
         if (startFrom.id > id) return null
@@ -61,18 +65,18 @@ internal abstract class SegmentQueue<S: Segment<S>>(createFirstSegmentLazily: Bo
         // uses it. This way, only one segment with each id can be in the queue.
         var cur: S = startFrom
         while (cur.id < id) {
-            var curNext = cur.next.value
+            var curNext = cur.next
             if (curNext == null) {
                 // Add a new segment.
                 val newTail = newSegment(cur.id + 1, cur)
-                curNext = if (cur.next.compareAndSet(null, newTail)) {
+                curNext = if (cur.casNext(null, newTail)) {
                     if (cur.removed) {
                         cur.remove()
                     }
                     moveTailForward(newTail)
                     newTail
                 } else {
-                    cur.next.value!!
+                    cur.next!!
                 }
             }
             cur = curNext
@@ -82,7 +86,7 @@ internal abstract class SegmentQueue<S: Segment<S>>(createFirstSegmentLazily: Bo
     }
 
     /**
-     * Invokes [getSegment] and replaces [first] with the result if its [id] is greater.
+     * Invokes [getSegment] and replaces [head] with the result if its [id] is greater.
      */
     protected fun getSegmentAndMoveFirst(startFrom: S?, id: Long): S? {
         if (startFrom !== null && startFrom.id == id) return startFrom
@@ -96,10 +100,9 @@ internal abstract class SegmentQueue<S: Segment<S>>(createFirstSegmentLazily: Bo
      * if its `id` is greater.
      */
     private fun moveHeadForward(new: S) {
-        while (true) {
-            val cur = first!!
-            if (cur.id > new.id) return
-            if (_head.compareAndSet(cur, new)) {
+        _head.loop { curHead ->
+            if (curHead!!.id > new.id) return
+            if (_head.compareAndSet(curHead, new)) {
                 new.prev.value = null
                 return
             }
@@ -111,10 +114,9 @@ internal abstract class SegmentQueue<S: Segment<S>>(createFirstSegmentLazily: Bo
      * if its `id` is greater.
      */
     private fun moveTailForward(new: S) {
-        while (true) {
-            val cur = last
-            if (cur !== null && cur.id > new.id) return
-            if (_tail.compareAndSet(cur, new)) return
+        _tail.loop { curTail ->
+            if (curTail !== null && curTail.id > new.id) return
+            if (_tail.compareAndSet(curTail, new)) return
         }
     }
 }
@@ -126,7 +128,9 @@ internal abstract class SegmentQueue<S: Segment<S>>(createFirstSegmentLazily: Bo
  */
 internal abstract class Segment<S: Segment<S>>(val id: Long, prev: S?) {
     // Pointer to the next segment, updates similarly to the Michael-Scott queue algorithm.
-    val next = atomic<S?>(null)
+    private val _next = atomic<S?>(null)
+    val next: S? get() = _next.value
+    fun casNext(expected: S?, value: S?): Boolean = _next.compareAndSet(expected, value)
     // Pointer to the previous segment, updates in [remove] function.
     val prev = atomic<S?>(null)
 
@@ -147,28 +151,30 @@ internal abstract class Segment<S: Segment<S>>(val id: Long, prev: S?) {
     fun remove() {
         check(removed) { " The segment should be logically removed at first "}
         // Read `next` and `prev` pointers.
-        val next = this.next.value ?: return // tail cannot be removed
-        val prev = prev.value ?: return // head cannot be removed
+        var next = this._next.value ?: return // tail cannot be removed
+        var prev = prev.value ?: return // head cannot be removed
         // Link `next` and `prev`.
+        prev.moveNextToRight(next)
+        while (prev.removed) {
+            prev = prev.prev.value ?: break
+            prev.moveNextToRight(next)
+        }
         next.movePrevToLeft(prev)
-        prev.movePrevNextToRight(next)
-        // Check whether `prev` and `next` are still in the queue
-        // and help with removing them if needed.
-        if (prev.removed)
-            prev.remove()
-        if (next.removed)
-            next.remove()
+        while (next.removed) {
+            next = next.next ?: break
+            next.movePrevToLeft(prev)
+        }
     }
 
     /**
      * Updates [next] pointer to the specified segment if
      * the [id] of the specified segment is greater.
      */
-    private fun movePrevNextToRight(next: S) {
+    private fun moveNextToRight(next: S) {
         while (true) {
-            val curNext = this.next.value as S
+            val curNext = this._next.value as S
             if (next.id <= curNext.id) return
-            if (this.next.compareAndSet(curNext, next)) return
+            if (this._next.compareAndSet(curNext, next)) return
         }
     }
 

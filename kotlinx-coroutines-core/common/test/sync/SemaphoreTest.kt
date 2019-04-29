@@ -66,7 +66,7 @@ class SemaphoreTest : TestBase() {
     fun withSemaphoreTest() = runTest {
         val semaphore = Semaphore(1)
         assertEquals(1, semaphore.availablePermits)
-        semaphore.withSemaphore {
+        semaphore.withPermit {
             assertEquals(0, semaphore.availablePermits)
         }
         assertEquals(1, semaphore.availablePermits)
